@@ -273,9 +273,16 @@ end
 
 result = nil
 p time_to_generate: time { result = ratios_in note_factors } # 25.5s
-p time_to_file_dump1: time { File.write "note_ratios.rbm", Marshal.dump(result) }
-p time_to_file_dump2: time {
-  File.open "note_ratios2.rbm", "w" do |file|
-    Marshal.dump result, file
-  end
-}
+
+require_relative 'lib/alternate_notes/persist'
+p time_to_persist: time {
+  AlternateNotes::Persist.dump_ratios(result, 'ratios.dump')
+} # ~24s
+
+# ~50s each
+# p time_to_file_dump1: time { File.write "note_ratios.rbm", Marshal.dump(result) }
+# p time_to_file_dump2: time {
+#   File.open "note_ratios2.rbm", "w" do |file|
+#     Marshal.dump result, file
+#   end
+# }
