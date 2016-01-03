@@ -1,25 +1,13 @@
-#  do |  re |  mi |  fa |  so |  la |   ti | do
-# ----+-----+-----+-----+-----+-----+------+----
-#   1 | 9/8 | 5/4 | 4/3 | 3/2 | 5/3 | 15/8 |  2
-#   A |   B |  C# |   D |   E |  F# |   G# |  A
+lowest_note = 55
+highest_a   = lowest_note *  # => 55
+                        2 *  # => 110
+                        2 *  # => 220
+                        2 *  # => 440
+                        2 *  # => 880
+                        2 *  # => 1760
+                        2    # => 3520
 
-# The 7 A octaves (each with 12 keys) + A, A#, B, C = the 88 keys on a piano
-lowest_note_h = 55
-highest_a = lowest_note_h *  # => 55
-             2            *  # => 110
-             2            *  # => 220
-             2            *  # => 440
-             2            *  # => 880
-             2            *  # => 1760
-             2               # => 3520
-
-# From the highest A (3520), we can get to the highest note (C#)
-highest_note_et = highest_a * (2**(3.0/12)) # => 4186.009044809578
-highest_note_h  = highest_a * 5 / 4         # => 4400
-
-# harmonic tuning vs equal tempered tuning (slightly flat)
-highest_note_h  / highest_a.to_f  # => 1.25
-highest_note_et / highest_a.to_f  # => 1.189207115002721
+highest_note  = highest_a * 5 / 4         # => 4400
 
 def prime_factors(n, factors=[], divisor=2)
   return factors                             if n == 1
@@ -28,11 +16,12 @@ def prime_factors(n, factors=[], divisor=2)
 end
 
 # prime factors available at various interesting notes
-prime_factors highest_a      # => [2, 2, 2, 2, 2, 2, 5, 11]
-prime_factors highest_note_h # => [2, 2, 2, 2, 5, 5, 11]
+prime_factors lowest_note  # => [5, 11]
+prime_factors highest_a    # => [2, 2, 2, 2, 2, 2, 5, 11]
+prime_factors highest_note # => [2, 2, 2, 2, 5, 5, 11]
 
 # Factors that allow us to make every note below the highest note
-factors = 2.upto(highest_note_h).each_with_object(Hash.new) do |frequency, all|
+factors = 2.upto(highest_note).each_with_object(Hash.new) do |frequency, all|
   prime_factors(frequency).group_by(&:itself).each do |n, ns|
     all[n] = [all.fetch(n, 0), ns.length].max
   end
@@ -70,7 +59,7 @@ end
 factor_array    = factors.flat_map { |factor, times| Array.new times, factor }
 note_factors = unique_combinations(factor_array, 1) { |base_freq, factor|
     freq = base_freq*factor
-    [freq, freq>highest_note_h]
+    [freq, freq>highest_note]
   }
   .map { |factors| [factors.inject(1, :*), factors] }
   .sort_by(&:first).to_h
