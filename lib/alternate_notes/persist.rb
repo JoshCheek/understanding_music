@@ -1,3 +1,7 @@
+# The reality is that this is useless b/c it takes
+# ~25s to calculate the results
+# ~23s to dump them to a file
+# ~39s to load them from the file
 module AlternateNotes
   module Persist
     extend self
