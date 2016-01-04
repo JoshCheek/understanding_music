@@ -1,3 +1,4 @@
+require 'pp'
 require 'set'
 require 'prime'
 
@@ -19,13 +20,14 @@ class LazyMath
     LazyMath.new number: number, transformations: @transformations
   end
 
-  def inspect
+  def to_s
     if @number
       "#{call} = #{@number} #{@transformations.join ' '}"
     else
       @transformations.join " "
     end
   end
+  alias inspect to_s
 
   def call
     @number or raise "#{inspect} does not have a number, so cannot give a result"
@@ -52,10 +54,11 @@ class Human
     rational == to_i
   end
 
-  def inspect
+  def to_s
     return to_i.to_s if integer?
     "(#{to_i}+#{remainder})"
   end
+  alias inspect to_s
 
   def to_human
     self
@@ -99,6 +102,14 @@ class Integer
 
   def to_human
     Human.new self
+  end
+
+  def to_math
+    to_r.to_math
+  end
+
+  def to_i!
+    self
   end
 end
 
@@ -180,6 +191,10 @@ class Tuning
     ratios.length
   end
 
+  def octave_dissonance
+    notes_by_octave.first.last.dissonance
+  end
+
   def inspect
     octaves = '%.2f' % (notes.length.to_f/notes_per_octave)
     "#<Tuning #{base_note}Hz-#{notes.max}Hz, #{notes.length} notes, #{octaves} octaves, #{notes_per_octave} notes / octave>"
@@ -201,22 +216,70 @@ class Tuning
     stat_length = stats.map(&:first).map(&:to_s).map(&:length).max
     stats.each { |value, description| display << sprintf("  %-#{stat_length}s %s\n", value.to_s, description) }
     display << "\n"
-    display << "  -----  Octaves  -----\n"
-    normalized_numerator_width = ratios.map { |r| (ratio_denominator * r).to_i!.inspect.length }.max
-    note_width                 = notes.max.inspect.length
-    n_width, d_width           = ratios.map { |r| [r.numerator, r.denominator] }.transpose.map { |ns| ns.map(&:inspect).map(&:length).max }
-    octave_index_length        = notes_by_octave.length.pred.to_s.length
 
-    notes_by_octave.each_with_index do |(octave, notes), octave_index|
-      notes.each_with_index do |note, note_index|
-        format_string = "  %#{octave_index_length+1}s "
-        format_string %= (note_index.zero? ?  "#{octave_index}:" : "")
-        format_string += "%-#{note_width+2}s | %#{normalized_numerator_width}d/#{ratio_denominator} | %#{n_width}d / %#{d_width}d | %p\n"
-        ratio = note.to_r / octave
-        display << sprintf(format_string, "#{note}Hz", (ratio_denominator*ratio).to_i!, ratio.numerator, ratio.denominator, ratio.to_math.for(octave))
+
+    chord_lines = [
+      "  -----  Chords  -----",
+      *resonant_chords.pretty_inspect.lines.map { |line| "  #{line.chomp}" },
+    ]
+
+    octave_lines = [
+      "  -----  Example Octave  -----",
+      *notes_by_octave.take(1).flat_map do |octave, notes|
+        normalized_numerator_width = ratios.map { |r| (ratio_denominator * r).to_i!.inspect.length }.max
+        note_width                 = notes.max.inspect.length
+        n_width, d_width           = ratios.map { |r| [r.numerator, r.denominator] }.transpose.map { |ns| ns.map(&:inspect).map(&:length).max }
+        octave_index_length        = notes_by_octave.length.pred.to_s.length
+        notes.map.with_index do |note, note_index|
+          format_string = "  %-#{note_width+2}s | %#{normalized_numerator_width}d/#{ratio_denominator} | %#{n_width}d / %#{d_width}d | %p"
+          ratio = note.to_r / octave
+          sprintf(format_string,
+                  "#{note} Hz",
+                  (ratio_denominator*ratio).to_i,
+                  ratio.numerator,
+                  ratio.denominator,
+                  ratio.to_math.for(octave))
+        end
+      end
+    ]
+    chord_lines  << "" while chord_lines.length < octave_lines.length
+    octave_lines << "" while chord_lines.length > octave_lines.length
+
+    chord_line_length = chord_lines.map(&:length).max
+    chord_lines.zip(octave_lines).map do |chord_line, octave_line|
+      display << sprintf("%-#{chord_line_length}s  %-s\n", chord_line, octave_line)
+    end
+
+    display << "\n"
+    display << "  -----  Notes By Octave  -----\n"
+    table = [['Octave', ratios], [:divider]] + notes_by_octave.map.with_index do |(octave, notes), octave_index|
+      [octave_index, notes]
+    end
+
+    note_length = [*notes, *ratios].map(&:inspect).map(&:length).max
+    key_length  = table.map { |row| row == [:divider] ? 1 : row.first.inspect.length }.max
+    table.each do |keycol, cells|
+      format = "    %-#{key_length}s | %#{note_length}s\n"
+      if keycol == :divider
+        display << sprintf(
+          format,
+          '-'*key_length,
+          '-'*(note_length*notes_per_octave + notes_per_octave)
+        )
+      else
+        display << sprintf(format, keycol, cells.map { |c| c.inspect.ljust note_length }.join(' '))
       end
     end
+
     display
+  end
+
+  def resonant_chords
+    notes = notes_for_octave base_note
+    unique_combinations(notes) { |chord| 200 < chord.dissonance }
+                       .reject { |chord| chord.length < 3 }
+                       .map    { |chord| Chord.new chord }
+                       .sort
   end
 
   private
@@ -229,4 +292,53 @@ class Tuning
     ratios.map { |ratio| ratio.to_math.for(octave).call }
           .select { |note| lower_bound <= note && note <= upper_bound }
   end
+
+  def unique_combinations(array, all=Set.new, current=[], start=0, &prune_search)
+    return all if array.length == start
+    (1..array.length-start).flat_map do |offset|
+      index       = start + offset
+      element     = array[index-1]
+      combination = [*current, element]
+      next if prune_search.call combination
+      next if all.include? combination
+      all << combination
+      unique_combinations(array, all, combination, index, &prune_search)
+    end
+    all
+  end
+
 end
+
+class Chord
+  attr_reader :notes, :base, :ratios
+
+  def initialize(notes)
+    @base     = notes.min
+    rationals = notes.map { |note| note.to_r / base }
+    denom     = rationals.lowest_common_denominator
+    @ratios, @notes = rationals.map { |rational| (rational*denom).to_i! }
+                               .zip(notes)
+                               .sort_by { |ratio, note| ratio }
+                               .transpose
+  end
+
+  def dissonance
+    @notes.dissonance
+  end
+
+  def inspect
+    "#<Chord dissonance: #{dissonance.to_s.rjust 3}, notes: [#{@notes.map(&:to_human).join(', ')}], ratios: #{ratios.join ':'}>"
+  end
+
+  include Comparable
+  def <=>(chord)
+    dissonance <=> chord.dissonance
+  end
+
+  private
+
+  def dissonance_for(note)
+    [base, note].dissonance
+  end
+end
+
