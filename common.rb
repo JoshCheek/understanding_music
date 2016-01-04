@@ -275,11 +275,13 @@ class Tuning
   end
 
   def resonant_chords
-    notes = notes_for_octave base_note
-    unique_combinations(notes) { |chord| 200 < chord.dissonance }
-                       .reject { |chord| chord.length < 3 }
-                       .map    { |chord| Chord.new chord }
-                       .sort
+    @resonant_chords ||= begin
+      notes = notes_for_octave base_note
+      unique_combinations(notes) { |chord| 200 < chord.dissonance }
+                         .reject { |chord| chord.length < 3 }
+                         .map    { |chord| Chord.new chord }
+                         .sort
+    end
   end
 
   private
@@ -323,22 +325,16 @@ class Chord
   end
 
   def dissonance
-    @notes.dissonance
+    @dissonance ||= @notes.dissonance
   end
 
   def inspect
-    "#<Chord dissonance: #{dissonance.to_s.rjust 3}, notes: [#{@notes.map(&:to_human).join(', ')}], ratios: #{ratios.join ':'}>"
+    @inspection ||= "#<Chord dissonance: #{dissonance.to_s.rjust 3}, notes: [#{@notes.map(&:to_human).join(', ')}], ratios: #{ratios.join ':'}>"
   end
 
   include Comparable
   def <=>(chord)
     dissonance <=> chord.dissonance
-  end
-
-  private
-
-  def dissonance_for(note)
-    [base, note].dissonance
   end
 end
 
