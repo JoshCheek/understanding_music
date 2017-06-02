@@ -70,7 +70,7 @@ tunings
                       .delete("#")
     if $stdout.tty?
       puts Rouge::Formatters::Terminal256
-             .new(theme: Rouge::Themes::Monokai.name)
+             .new(Rouge::Themes::Monokai)
              .format(Rouge::Lexers::Ruby.new.lex inspected)
       puts "Press return to see the next one"
       gets

@@ -251,7 +251,7 @@ class Tuning
     end
 
     display << "\n"
-    display << "  -----  Notes By Octave  -----\n"
+    display << "    -----  Notes By Octave  -----\n"
     table = [['Octave', ratios], [:divider]] + notes_by_octave.map.with_index do |(octave, notes), octave_index|
       [octave_index, notes]
     end
